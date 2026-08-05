@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- Shared compiler pipes are unavailable in some containers; in-process compilation is deterministic. -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>
