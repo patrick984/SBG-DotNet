@@ -12,7 +12,8 @@ public sealed class SbgStreamDecoder
 
     public IReadOnlyList<SbgMessage> Append(ReadOnlySpan<byte> data)
     {
-        if (!data.IsEmpty) _buffer.AddRange(data.ToArray());
+        if (!data.IsEmpty)
+            _buffer.AddRange(data.ToArray());
         var messages = new List<SbgMessage>();
         while (TryTakeFrame(out var frame))
         {
@@ -44,8 +45,10 @@ public sealed class SbgStreamDecoder
                     _buffer.Clear();
                 return false;
             }
-            if (sync > 0) _buffer.RemoveRange(0, sync);
-            if (_buffer.Count < 6) return false;
+            if (sync > 0)
+                _buffer.RemoveRange(0, sync);
+            if (_buffer.Count < 6)
+                return false;
             var wirePayloadSize = _buffer[4] | (_buffer[5] << 8);
             if (wirePayloadSize > SbgFrameCodec.MaximumPayloadSize)
             {
@@ -54,7 +57,8 @@ public sealed class SbgStreamDecoder
                 continue;
             }
             var frameSize = wirePayloadSize + 9;
-            if (_buffer.Count < frameSize) return false;
+            if (_buffer.Count < frameSize)
+                return false;
             var bytes = _buffer.GetRange(0, frameSize).ToArray();
             if (bytes[^1] != SbgFrameCodec.Etx)
             {
@@ -88,10 +92,26 @@ public sealed class SbgStreamDecoder
                     DecodeFailed?.Invoke(this, new(DecodeError.InvalidExtendedFrame, bytes));
                     continue;
                 }
-                frame = new((byte)(messageClass & 0x7f), bytes[2], bytes.AsMemory(11, wirePayloadSize - 5), true, transferId, page, pages);
+                frame = new(
+                    (byte)(messageClass & 0x7f),
+                    bytes[2],
+                    bytes.AsMemory(11, wirePayloadSize - 5),
+                    true,
+                    transferId,
+                    page,
+                    pages
+                );
             }
             else
-                frame = new(messageClass, bytes[2], bytes.AsMemory(6, wirePayloadSize), false, 0, 0, 0);
+                frame = new(
+                    messageClass,
+                    bytes[2],
+                    bytes.AsMemory(6, wirePayloadSize),
+                    false,
+                    0,
+                    0,
+                    0
+                );
             return true;
         }
     }
@@ -108,8 +128,13 @@ public sealed class SbgStreamDecoder
         }
         _transfer.Payload.AddRange(frame.Payload.ToArray());
         _transfer.NextPage++;
-        if (_transfer.NextPage != _transfer.PageCount) return null;
-        var message = new SbgMessage(_transfer.MessageClass, _transfer.MessageId, _transfer.Payload.ToArray());
+        if (_transfer.NextPage != _transfer.PageCount)
+            return null;
+        var message = new SbgMessage(
+            _transfer.MessageClass,
+            _transfer.MessageId,
+            _transfer.Payload.ToArray()
+        );
         _transfer = null;
         return message;
     }
@@ -117,17 +142,30 @@ public sealed class SbgStreamDecoder
     private int FindSync()
     {
         for (var i = 0; i + 1 < _buffer.Count; i++)
-            if (_buffer[i] == SbgFrameCodec.Sync1 && _buffer[i + 1] == SbgFrameCodec.Sync2) return i;
+            if (_buffer[i] == SbgFrameCodec.Sync1 && _buffer[i + 1] == SbgFrameCodec.Sync2)
+                return i;
         return -1;
     }
 
     private void Fail(DecodeError error, int length) =>
         DecodeFailed?.Invoke(this, new(error, _buffer.GetRange(0, length).ToArray()));
 
-    private readonly record struct Frame(byte MessageClass, byte MessageId, ReadOnlyMemory<byte> Payload,
-        bool IsExtended, byte TransferId, ushort PageIndex, ushort PageCount);
+    private readonly record struct Frame(
+        byte MessageClass,
+        byte MessageId,
+        ReadOnlyMemory<byte> Payload,
+        bool IsExtended,
+        byte TransferId,
+        ushort PageIndex,
+        ushort PageCount
+    );
 
-    private sealed class LargeTransfer(byte messageClass, byte messageId, byte transferId, ushort pageCount)
+    private sealed class LargeTransfer(
+        byte messageClass,
+        byte messageId,
+        byte transferId,
+        ushort pageCount
+    )
     {
         public byte MessageClass { get; } = messageClass;
         public byte MessageId { get; } = messageId;
@@ -135,7 +173,11 @@ public sealed class SbgStreamDecoder
         public ushort PageCount { get; } = pageCount;
         public ushort NextPage { get; set; }
         public List<byte> Payload { get; } = [];
-        public bool Matches(Frame frame) => MessageClass == frame.MessageClass && MessageId == frame.MessageId &&
-            TransferId == frame.TransferId && PageCount == frame.PageCount;
+
+        public bool Matches(Frame frame) =>
+            MessageClass == frame.MessageClass
+            && MessageId == frame.MessageId
+            && TransferId == frame.TransferId
+            && PageCount == frame.PageCount;
     }
 }

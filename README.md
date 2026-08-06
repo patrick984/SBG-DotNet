@@ -24,6 +24,15 @@ foreach (var message in decoder.Append(bytesReadFromYourTransport))
 byte[] request = SbgFrameCodec.Encode(messageClass: 0x10, messageId: 0x01, payload);
 ```
 
+Every typed message provides `ToUserReadableString()` and overrides `ToString()` with the same
+culture-independent representation. Incoming messages can also be exported in long-form CSV:
+
+```csharp
+string csv = CsvMessageSerializer.Serialize(messages);
+// Timestamp,Message ID,Value,Unit
+// 42,Depth (47),101325.5,Pa
+```
+
 `SbgStreamDecoder` accepts arbitrary chunks, retains incomplete frames, skips noise, reports corrupt
 frames through `DecodeFailed`, and reassembles extended multi-page payloads. `BinaryMessageReader`
 is public for binary log layouts not represented by a typed record; unknown message IDs remain available
@@ -42,3 +51,13 @@ extended payload behavior in C#—without xUnit, NuGet test packages, P/Invoke, 
 
 The C# project itself has no `PackageReference` entries. Upstream C source is included only as a test
 reference and remains under its MIT license.
+
+## Formatting
+
+CSharpier 1.3.0 is pinned as a local .NET tool. After restoring tools, format or validate sources with:
+
+```bash
+dotnet tool restore
+dotnet csharpier format .
+dotnet csharpier check .
+```

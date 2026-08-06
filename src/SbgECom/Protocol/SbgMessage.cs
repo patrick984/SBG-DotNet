@@ -8,10 +8,11 @@ public enum DecodeError
     InvalidFrame,
     InvalidCrc,
     InvalidExtendedFrame,
-    ExtendedFrameOutOfSequence
+    ExtendedFrameOutOfSequence,
 }
 
-public sealed class DecodeErrorEventArgs(DecodeError error, ReadOnlyMemory<byte> candidate) : EventArgs
+public sealed class DecodeErrorEventArgs(DecodeError error, ReadOnlyMemory<byte> candidate)
+    : EventArgs
 {
     public DecodeError Error { get; } = error;
     public ReadOnlyMemory<byte> Candidate { get; } = candidate;
