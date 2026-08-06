@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Reflection;
 using SbgECom.Protocol;
 
 namespace SbgECom.BinaryMessages;
@@ -13,7 +12,7 @@ public static class BinaryMessageTextSerializer
         var values = MessageValueExtractor
             .Extract(message)
             .Select(field => $"{field.Name}={field.DisplayValue}");
-        return $"{message.GetType().Name} {{ {string.Join(", ", values)} }}";
+        return $"{MessageValueExtractor.NameOf(message)} {{ {string.Join(", ", values)} }}";
     }
 }
 
@@ -138,56 +137,184 @@ internal static class MessageValueExtractor
 
     public static IEnumerable<Field> Extract(IBinaryMessage message)
     {
-        foreach (
-            var property in message
-                .GetType()
-                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .OrderBy(property => property.MetadataToken)
-        )
+        return message switch
         {
-            var value = property.GetValue(message);
-            if (value is byte[] bytes)
-            {
-                var text = Convert.ToHexString(bytes);
-                yield return new(property.Name, text, text, "hex");
-            }
-            else if (value is Array array)
-            {
-                for (var index = 0; index < array.Length; index++)
-                {
-                    var name = $"{property.Name}[{index}]";
-                    yield return new(
-                        name,
-                        Format(array.GetValue(index), property.Name, statusesAsHex: true),
-                        Format(array.GetValue(index), property.Name, statusesAsHex: false),
-                        UnitFor(message, name)
-                    );
-                }
-            }
-            else
-            {
-                yield return new(
-                    property.Name,
-                    Format(value, property.Name, statusesAsHex: true),
-                    Format(value, property.Name, statusesAsHex: false),
-                    UnitFor(message, property.Name)
-                );
-            }
-        }
+            StatusLog value =>
+            [
+                Scalar("TimeStamp", value.TimeStamp, "µs"),
+                Status("GeneralStatus", value.GeneralStatus),
+                Status("CommunicationStatus2", value.CommunicationStatus2),
+                Status("CommunicationStatus", value.CommunicationStatus),
+                Status("AidingStatus", value.AidingStatus),
+                Scalar("Reserved2", value.Reserved2),
+                Scalar("Reserved3", value.Reserved3),
+                Scalar("Uptime", value.Uptime, "s"),
+                Scalar("CpuUsage", value.CpuUsage, "%"),
+            ],
+            ImuLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs"), Status("Status", value.Status)],
+                Vector("Accelerometers", value.Accelerometers, "m/s²"),
+                Vector("Gyroscopes", value.Gyroscopes, "rad/s"),
+                [Scalar("Temperature", value.Temperature, "°C")],
+                Vector("DeltaVelocity", value.DeltaVelocity, "m/s"),
+                Vector("DeltaAngle", value.DeltaAngle, "rad")
+            ),
+            ImuShortLog value => Concat(
+                [
+                    Scalar("TimeStamp", value.TimeStamp, "µs"),
+                    Status("Status", value.Status),
+                    Scalar("Temperature", value.Temperature, "°C"),
+                ],
+                Vector("DeltaVelocity", value.DeltaVelocity, "LSB"),
+                Vector("DeltaAngle", value.DeltaAngle, "LSB")
+            ),
+            EkfEulerLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs")],
+                Vector("Euler", value.Euler, "rad"),
+                Vector("EulerStdDev", value.EulerStdDev, "rad"),
+                [
+                    Status("Status", value.Status),
+                    Scalar("MagneticDeclination", value.MagneticDeclination, "rad"),
+                    Scalar("MagneticInclination", value.MagneticInclination, "rad"),
+                ]
+            ),
+            EkfQuaternionLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs")],
+                Vector("Quaternion", value.Quaternion),
+                Vector("EulerStdDev", value.EulerStdDev, "rad"),
+                [
+                    Status("Status", value.Status),
+                    Scalar("MagneticDeclination", value.MagneticDeclination, "rad"),
+                    Scalar("MagneticInclination", value.MagneticInclination, "rad"),
+                ]
+            ),
+            EkfNavigationLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs")],
+                Vector("Velocity", value.Velocity, "m/s"),
+                Vector("VelocityStdDev", value.VelocityStdDev, "m/s"),
+                Position(value.Position),
+                [Scalar("Undulation", value.Undulation, "m")],
+                Vector("PositionStdDev", value.PositionStdDev, "m"),
+                [Status("Status", value.Status)]
+            ),
+            VectorAccuracyLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs"), Status("Status", value.Status)],
+                Vector("Vector", value.Vector, "m/s"),
+                Vector("StandardDeviation", value.StandardDeviation, "m/s")
+            ),
+            AidingVectorLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs"), Status("Status", value.Status)],
+                Vector("Vector", value.Vector, "m/s"),
+                Vector("StandardDeviation", value.StandardDeviation, "m/s")
+            ),
+            DepthLog value =>
+            [
+                Scalar("TimeStamp", value.TimeStamp, "µs"),
+                Status("Status", value.Status),
+                Scalar("Pressure", value.Pressure, "Pa"),
+                Scalar("Depth", value.Depth, "m"),
+            ],
+            DvlLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs"), Status("Status", value.Status)],
+                Vector("Velocity", value.Velocity, "m/s"),
+                Vector("VelocityQuality", value.VelocityQuality, "m/s")
+            ),
+            EventLog value =>
+            [
+                Scalar("TimeStamp", value.TimeStamp, "µs"),
+                Status("Status", value.Status),
+                Scalar("TimeOffset0", value.TimeOffset0, "µs"),
+                Scalar("TimeOffset1", value.TimeOffset1, "µs"),
+                Scalar("TimeOffset2", value.TimeOffset2, "µs"),
+                Scalar("TimeOffset3", value.TimeOffset3, "µs"),
+            ],
+            MagLog value => Concat(
+                [Scalar("TimeStamp", value.TimeStamp, "µs"), Status("Status", value.Status)],
+                Vector("Magnetometers", value.Magnetometers, "LSB"),
+                Vector("Accelerometers", value.Accelerometers, "LSB"),
+                [Scalar("Rejection", value.Rejection)]
+            ),
+            OdometerLog value =>
+            [
+                Scalar("TimeStamp", value.TimeStamp, "µs"),
+                Status("Status", value.Status),
+                Scalar("Velocity", value.Velocity, "m/s"),
+            ],
+            RawDataLog value => [Bytes("Data", value.Data)],
+            DiagnosticLog value =>
+            [
+                Scalar("TimeStamp", value.TimeStamp, "µs"),
+                Scalar("Type", value.Type),
+                Scalar("ErrorCode", value.ErrorCode),
+                Scalar("Message", value.Message),
+            ],
+            SessionInfoLog value =>
+            [
+                Scalar("PageIndex", value.PageIndex),
+                Scalar("PageCount", value.PageCount),
+                Bytes("Data", value.Data),
+            ],
+            _ => throw new ArgumentException("Unsupported binary message type.", nameof(message)),
+        };
     }
 
-    private static string Format(object? value, string propertyName, bool statusesAsHex)
+    public static string NameOf(IBinaryMessage message) =>
+        message switch
+        {
+            StatusLog => nameof(StatusLog),
+            ImuLog => nameof(ImuLog),
+            ImuShortLog => nameof(ImuShortLog),
+            EkfEulerLog => nameof(EkfEulerLog),
+            EkfQuaternionLog => nameof(EkfQuaternionLog),
+            EkfNavigationLog => nameof(EkfNavigationLog),
+            VectorAccuracyLog => nameof(VectorAccuracyLog),
+            AidingVectorLog => nameof(AidingVectorLog),
+            DepthLog => nameof(DepthLog),
+            DvlLog => nameof(DvlLog),
+            EventLog => nameof(EventLog),
+            MagLog => nameof(MagLog),
+            OdometerLog => nameof(OdometerLog),
+            RawDataLog => nameof(RawDataLog),
+            DiagnosticLog => nameof(DiagnosticLog),
+            SessionInfoLog => nameof(SessionInfoLog),
+            _ => throw new ArgumentException("Unsupported binary message type.", nameof(message)),
+        };
+
+    private static Field Scalar(string name, object? value, string unit = "") =>
+        new(name, Format(value, statusAsHex: false), Format(value, statusAsHex: false), unit);
+
+    private static Field Status(string name, object value) =>
+        new(name, Format(value, statusAsHex: true), Format(value, statusAsHex: false), "");
+
+    private static Field Bytes(string name, byte[] value)
+    {
+        var text = Convert.ToHexString(value);
+        return new(name, text, text, "hex");
+    }
+
+    private static IEnumerable<Field> Vector<T>(string name, T[] values, string unit = "")
+    {
+        for (var index = 0; index < values.Length; index++)
+            yield return Scalar($"{name}[{index}]", values[index], unit);
+    }
+
+    private static IEnumerable<Field> Position(double[] values)
+    {
+        for (var index = 0; index < values.Length; index++)
+            yield return Scalar($"Position[{index}]", values[index], index < 2 ? "deg" : "m");
+    }
+
+    private static IEnumerable<Field> Concat(params IEnumerable<Field>[] groups) =>
+        groups.SelectMany(group => group);
+
+    private static string Format(object? value, bool statusAsHex)
     {
         if (value is null)
         {
             return string.Empty;
         }
 
-        if (
-            statusesAsHex
-            && propertyName.Contains("Status", StringComparison.Ordinal)
-            && value is IConvertible
-        )
+        if (statusAsHex && value is IConvertible)
         {
             return $"0x{Convert.ToUInt64(value, CultureInfo.InvariantCulture):X}";
         }
@@ -199,51 +326,5 @@ internal static class MessageValueExtractor
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
             _ => value.ToString() ?? string.Empty,
         };
-    }
-
-    private static string UnitFor(IBinaryMessage message, string name)
-    {
-        if (
-            name == nameof(IBinaryLog.TimeStamp)
-            || name.StartsWith("TimeOffset", StringComparison.Ordinal)
-        )
-            return "µs";
-        if (name is "Uptime")
-            return "s";
-        if (name is "CpuUsage")
-            return "%";
-        if (name.Contains("Temperature", StringComparison.Ordinal))
-            return "°C";
-        if (name.Contains("Pressure", StringComparison.Ordinal))
-            return "Pa";
-        if (name is "Depth" or "Undulation")
-            return "m";
-        if (
-            name.StartsWith("Euler", StringComparison.Ordinal)
-            || name.StartsWith("DeltaAngle", StringComparison.Ordinal)
-        )
-            return "rad";
-        if (name is "MagneticDeclination" or "MagneticInclination")
-            return "rad";
-        if (name.StartsWith("Gyroscopes", StringComparison.Ordinal))
-            return "rad/s";
-        if (name.StartsWith("Accelerometers", StringComparison.Ordinal))
-            return message is MagLog ? "LSB" : "m/s²";
-        if (name.StartsWith("Magnetometers", StringComparison.Ordinal))
-            return "LSB";
-        if (name.StartsWith("DeltaVelocity", StringComparison.Ordinal))
-            return message is ImuShortLog ? "LSB" : "m/s";
-        if (
-            name.StartsWith("Velocity", StringComparison.Ordinal)
-            || name.StartsWith("Vector", StringComparison.Ordinal)
-        )
-            return "m/s";
-        if (name is "Position[0]" or "Position[1]")
-            return "deg";
-        if (name == "Position[2]")
-            return "m";
-        if (name is "Data")
-            return "hex";
-        return string.Empty;
     }
 }

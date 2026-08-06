@@ -52,6 +52,13 @@ extended payload behavior in C#—without xUnit, NuGet test packages, P/Invoke, 
 The C# project itself has no `PackageReference` entries. Upstream C source is included only as a test
 reference and remains under its MIT license.
 
+## Native AOT
+
+The library enables the .NET trimming and native-AOT compatibility analyzers through
+`IsAotCompatible`. Message formatting uses exhaustive type patterns and does not use reflection or
+runtime code generation. `tests/run-tests.sh` publishes and runs a native-AOT smoke executable that
+exercises framing, parsing, human-readable output, and CSV serialization.
+
 ## Formatting
 
 CSharpier 1.3.0 is pinned as a local .NET tool. After restoring tools, format or validate sources with:

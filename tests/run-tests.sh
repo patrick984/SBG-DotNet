@@ -18,3 +18,6 @@ DOTNET_CLI_HOME="${DOTNET_CLI_HOME:-/tmp/dotnet-sbg}" dotnet restore \
   "$repo_dir/tests/SbgECom.Tests/SbgECom.Tests.csproj" --ignore-failed-sources >/dev/null
 DOTNET_CLI_HOME="${DOTNET_CLI_HOME:-/tmp/dotnet-sbg}" dotnet run \
   -p:UseSharedCompilation=false --project "$repo_dir/tests/SbgECom.Tests/SbgECom.Tests.csproj" -- "$oracle"
+DOTNET_CLI_HOME="${DOTNET_CLI_HOME:-/tmp/dotnet-sbg}" dotnet publish \
+  "$repo_dir/tests/SbgECom.AotSmoke/SbgECom.AotSmoke.csproj" -c Release -o /tmp/sbgecom-aot-smoke --nologo
+/tmp/sbgecom-aot-smoke/SbgECom.AotSmoke

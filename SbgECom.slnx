@@ -3,6 +3,7 @@
     <Project Path="src/SbgECom/SbgECom.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/SbgECom.AotSmoke/SbgECom.AotSmoke.csproj" />
     <Project Path="tests/SbgECom.Tests/SbgECom.Tests.csproj" />
   </Folder>
 </Solution>
